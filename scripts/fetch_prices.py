@@ -7,7 +7,6 @@ import json
 import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta, timezone
-import os
 
 # ── 品名分類白名單（對應 MarketPriceService.swift 邏輯）──────────────────────
 VEGETABLE_KW = [
@@ -29,6 +28,54 @@ FRUIT_KW = [
 FLOWER_KW = ["玫瑰","菊花","百合","唐菖蒲","非洲菊","文心蘭","石斛蘭","蝴蝶蘭","鬱金香","桔梗"]
 SEAFOOD_KW = ["魚","蝦","蟹","蟳","蚵","牡蠣","蛤","鱸","虱目","吳郭","鮪","烏魚","帶魚",
               "鯖","鯧","鱲","魽","鰱","透抽","花枝","龍蝦","小卷","萬引"]
+
+# ── API 品名 → 顯示關鍵字 反向對照表（對應 MarketPriceService.apiNameAliases）──
+# 農業部 API 品名（如「葉用甘藷」）→ App 顯示名稱（如「地瓜葉」）
+API_ALIAS: dict[str, list[str]] = {
+    "地瓜葉": ["葉用甘藷", "甘藷葉", "地瓜葉", "番薯葉"],
+    "小黃瓜": ["小黃瓜", "胡瓜"],
+    "空心菜": ["空心菜", "蕹菜"],
+    "蕹菜":   ["蕹菜", "空心菜"],
+    "莧菜":   ["莧菜", "刺莧", "野莧"],
+    "龍鬚菜": ["龍鬚菜", "龍鬚", "佛手瓜嫩莖"],
+    "茼蒿":   ["茼蒿", "打某菜"],
+    "芥藍":   ["芥藍", "格藍菜"],
+    "白蘿蔔": ["白蘿蔔", "蘿蔔"],
+    "高麗菜": ["高麗菜", "甘藍", "包心菜"],
+    "甘藍":   ["甘藍", "高麗菜", "包心菜"],
+    "菜豆":   ["菜豆", "長豇豆", "豇豆", "四季豆", "敏豆"],
+    "四季豆": ["四季豆", "菜豆", "敏豆", "長豇豆"],
+    "絲瓜":   ["絲瓜", "菜瓜"],
+    "苦瓜":   ["苦瓜", "涼瓜"],
+    "南瓜":   ["南瓜", "金瓜"],
+    "茄子":   ["茄子", "矮性茄", "長茄"],
+    "甜椒":   ["甜椒", "彩椒", "青椒"],
+    "玉米":   ["玉米", "甜玉米", "糯玉米"],
+    "竹筍":   ["竹筍", "綠竹筍", "麻竹筍", "桂竹筍", "烏殼綠竹"],
+    "茭白筍": ["茭白筍", "筊白筍", "茭白"],
+    "芋頭":   ["芋頭", "芋", "白芋"],
+    "山藥":   ["山藥", "淮山", "長山藥", "日本山藥"],
+    "蓮藕":   ["蓮藕", "藕"],
+    "蘆筍":   ["蘆筍", "石刁柏"],
+    "菱角":   ["菱角", "菱"],
+    "馬鈴薯": ["馬鈴薯", "洋芋", "土豆"],
+    "地瓜":   ["甘藷", "地瓜", "番薯"],
+    "芭樂":   ["芭樂", "番石榴"],
+    "百香果": ["百香果", "西番蓮"],
+    "釋迦":   ["釋迦", "番荔枝"],
+}
+# 建立反向查表：API品名片段 → 顯示關鍵字
+_REVERSE_ALIAS: dict[str, str] = {}
+for display, api_names in API_ALIAS.items():
+    for api_name in api_names:
+        _REVERSE_ALIAS[api_name] = display
+
+def normalize_name(crop_name: str) -> str:
+    """將 API 回傳品名正規化為 App 顯示關鍵字，找不到則原樣回傳"""
+    for api_name, display in _REVERSE_ALIAS.items():
+        if api_name in crop_name:
+            return display
+    return crop_name
 
 def classify(name: str) -> str | None:
     base = name.split("-")[0].split("－")[0].strip()
@@ -109,17 +156,18 @@ def agri_to_price(r: dict) -> dict | None:
     cat  = classify(crop)
     if cat is None:
         return None
-    date     = r.get("TransDate", "")
-    market   = r.get("MarketName", "")
-    high     = parse_float(r.get("Upper_Price", 0))
-    mid      = parse_float(r.get("Middle_Price", 0))
-    low      = parse_float(r.get("Lower_Price", 0))
+    date         = r.get("TransDate", "")
+    market       = r.get("MarketName", "")
+    high         = parse_float(r.get("Upper_Price", 0))
+    mid          = parse_float(r.get("Middle_Price", 0))
+    low          = parse_float(r.get("Lower_Price", 0))
     if mid <= 0:
         return None
+    display_name = normalize_name(crop)  # 「葉用甘藷」→「地瓜葉」等
     return {
-        "id":          f"{date}-{crop}-{market}",
+        "id":          f"{date}-{display_name}-{market}",
         "date":        date,
-        "productName": crop,
+        "productName": display_name,
         "market":      market,
         "highPrice":   round(high, 1),
         "midPrice":    round(mid, 1),
@@ -206,7 +254,7 @@ def main():
     for cat, count in sorted(cats.items()):
         print(f"   {cat}: {count} 筆")
 
-   # 寫出 JSON
+    # 寫出 JSON
     import os
     os.makedirs("docs", exist_ok=True)
     meta = {
