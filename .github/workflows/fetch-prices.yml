@@ -1,0 +1,47 @@
+name: 每日行情快取更新
+
+on:
+  schedule:
+    # 台灣時間 23:30（UTC 15:30）— 農業部收盤後約 2 小時
+    - cron: "30 15 * * *"
+  workflow_dispatch:   # 允許手動觸發
+
+jobs:
+  fetch-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 需要 push 到 gh-pages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 抓取行情資料
+        run: python scripts/fetch_prices.py
+
+      - name: 確認輸出
+        run: |
+          echo "=== prices.json 前 3 筆 ==="
+          python3 -c "
+          import json
+          with open('docs/prices.json') as f:
+              d = json.load(f)
+          print(f'updatedAt: {d[\"updatedAt\"]}')
+          print(f'count: {d[\"count\"]}')
+          for p in d['prices'][:3]:
+              print(p)
+          "
+
+      - name: Deploy 到 GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          force_orphan: true    # gh-pages branch 只保留最新一次
+          commit_message: "chore: 更新行情快取 ${{ github.run_id }}"
