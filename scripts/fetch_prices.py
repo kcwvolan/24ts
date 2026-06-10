@@ -128,7 +128,7 @@ def fetch_agri_page(start_date: str, end_date: str, page: int = 1) -> tuple[list
     has_next = (raw_next is True) or (str(raw_next).lower() == "true")
     return records, has_next
 
-def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 7) -> list[dict]:
+def fetch_all_agri(lookback: int = 5) -> list[dict]:
     for offset in range(lookback):
         date_str = roc_date(offset)
         print(f"  農業部 {date_str}…", end=" ")
@@ -156,7 +156,7 @@ SUPPLEMENT_QUERIES: list[tuple[str, str]] = [
     ("山藥",   "淮山"),
 ]
 
-def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 3) -> list[dict]:
+def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 7) -> list[dict]:
     """以指定 CropName 查詢，結果的 CropName 強制設為 display_name"""
     params_base = {"End_time": "", "Start_time": "", "CropName": crop_name}
     for offset in range(lookback):
