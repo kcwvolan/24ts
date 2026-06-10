@@ -7,7 +7,7 @@ import json
 import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta, timezone
-
+ 
 # ── 品名分類白名單（對應 MarketPriceService.swift 邏輯）──────────────────────
 VEGETABLE_KW = [
     "高麗菜","甘藍","包心菜","白菜","小白菜","大白菜","菠菜","空心菜","蕹菜","莧菜","茼蒿",
@@ -28,7 +28,7 @@ FRUIT_KW = [
 FLOWER_KW = ["玫瑰","菊花","百合","唐菖蒲","非洲菊","文心蘭","石斛蘭","蝴蝶蘭","鬱金香","桔梗"]
 SEAFOOD_KW = ["魚","蝦","蟹","蟳","蚵","牡蠣","蛤","鱸","虱目","吳郭","鮪","烏魚","帶魚",
               "鯖","鯧","鱲","魽","鰱","透抽","花枝","龍蝦","小卷","萬引"]
-
+ 
 # ── API 品名 → 顯示關鍵字 反向對照表（對應 MarketPriceService.apiNameAliases）──
 # 農業部 API 品名（如「葉用甘藷」）→ App 顯示名稱（如「地瓜葉」）
 API_ALIAS: dict[str, list[str]] = {
@@ -69,7 +69,7 @@ _REVERSE_ALIAS: dict[str, str] = {}
 for display, api_names in API_ALIAS.items():
     for api_name in api_names:
         _REVERSE_ALIAS[api_name] = display
-
+ 
 def normalize_name(crop_name: str) -> str:
     """將 API 回傳品名正規化為 App 顯示關鍵字，取最長匹配避免子字串誤判"""
     matches = [(api_name, display) for api_name, display in _REVERSE_ALIAS.items()
@@ -78,7 +78,7 @@ def normalize_name(crop_name: str) -> str:
         return crop_name
     # 取最長 api_name，例：「葉用甘藷」優先於「甘藷」，避免誤判為「地瓜」
     return max(matches, key=lambda x: len(x[0]))[1]
-
+ 
 def classify(name: str) -> str | None:
     base = name.split("-")[0].split("－")[0].strip()
     if any(kw in base for kw in FLOWER_KW):
@@ -90,18 +90,18 @@ def classify(name: str) -> str | None:
     if any(kw in base for kw in SEAFOOD_KW):
         return "漁貨"
     return None
-
+ 
 # ── 日期工具（民國年格式）─────────────────────────────────────────────────────
 def roc_date(offset_days: int = 0) -> str:
     d = datetime.now() - timedelta(days=offset_days)
     roc_year = d.year - 1911
     return f"{roc_year}.{d.month:02d}.{d.day:02d}"
-
+ 
 def roc_date_no_dots(offset_days: int = 0) -> str:
     d = datetime.now() - timedelta(days=offset_days)
     roc_year = d.year - 1911
     return f"{roc_year}{d.month:02d}{d.day:02d}"
-
+ 
 def fetch_json(url: str) -> list | dict | None:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "SolarTermApp/1.0"})
@@ -111,10 +111,10 @@ def fetch_json(url: str) -> list | dict | None:
     except Exception as e:
         print(f"  ⚠ fetch failed: {url[:80]} — {e}")
         return None
-
+ 
 # ── 農業部農糧署行情 ──────────────────────────────────────────────────────────
 AGRI_BASE = "https://data.moa.gov.tw/api/v1/AgriProductsTransType/"
-
+ 
 def fetch_agri_page(start_date: str, end_date: str, page: int = 1) -> tuple[list, bool]:
     params = urllib.parse.urlencode({
         "Start_time": start_date,
@@ -129,7 +129,7 @@ def fetch_agri_page(start_date: str, end_date: str, page: int = 1) -> tuple[list
     raw_next = data.get("Next", False)
     has_next = (raw_next is True) or (str(raw_next).lower() == "true")
     return records, has_next
-
+ 
 def fetch_all_agri(lookback: int = 5) -> list[dict]:
     for offset in range(lookback):
         date_str = roc_date(offset)
@@ -144,7 +144,7 @@ def fetch_all_agri(lookback: int = 5) -> list[dict]:
         if records:
             return records
     return []
-
+ 
 # 全量抓取不穩定的品名，需指定 CropName 補查
 # 對應 Swift 的 forceSupplementAgriKeywords
 SUPPLEMENT_QUERIES: list[tuple[str, str]] = [
@@ -157,7 +157,7 @@ SUPPLEMENT_QUERIES: list[tuple[str, str]] = [
     ("蘆筍",   "石刁柏"),
     ("山藥",   "淮山"),
 ]
-
+ 
 def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 7) -> list[dict]:
     """以指定 CropName 查詢最近 lookback 天的資料（一次查日期區間，比逐日更可靠）"""
     start_date = roc_date(lookback - 1)   # e.g. 7 天前
@@ -176,7 +176,7 @@ def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 7) -> 
     for r in records:
         r["CropName"] = display_name
     return records
-
+ 
 def parse_float(val) -> float:
     try:
         if isinstance(val, (int, float)):
@@ -184,7 +184,7 @@ def parse_float(val) -> float:
         return float(str(val).strip()) if val else 0.0
     except:
         return 0.0
-
+ 
 def agri_to_price(r: dict) -> dict | None:
     crop = r.get("CropName", "")
     cat  = classify(crop)
@@ -217,10 +217,10 @@ def agri_to_price(r: dict) -> dict | None:
         "lowPrice":    round(low, 1),
         "category":    cat,
     }
-
+ 
 # ── 農業部漁業署行情 ──────────────────────────────────────────────────────────
 AQUATIC_BASE = "https://data.moa.gov.tw/Service/OpenData/FromM/AquaticTransData.aspx"
-
+ 
 def fetch_all_aquatic(lookback: int = 3) -> list[dict]:
     for offset in range(lookback):
         date_str = roc_date_no_dots(offset)
@@ -242,7 +242,7 @@ def fetch_all_aquatic(lookback: int = 3) -> list[dict]:
         if records:
             return records
     return []
-
+ 
 def aquatic_to_price(r: dict) -> dict | None:
     fish_name = r.get("魚貨名稱", "")
     if not fish_name or fish_name in ("休市", "-", ""):
@@ -266,7 +266,7 @@ def aquatic_to_price(r: dict) -> dict | None:
         "lowPrice":    round(parse_float(r.get("下價", mid)), 1),
         "category":    "漁貨",
     }
-
+ 
 # ── 去重 ──────────────────────────────────────────────────────────────────────
 def deduplicate(prices: list[dict]) -> list[dict]:
     seen = set()
@@ -276,12 +276,12 @@ def deduplicate(prices: list[dict]) -> list[dict]:
             seen.add(p["id"])
             out.append(p)
     return out
-
+ 
 # ── 主程式 ────────────────────────────────────────────────────────────────────
 def main():
     print("=== 農業部農糧署行情 ===")
     agri_raw = fetch_all_agri()
-
+ 
     # 補查全量抓取不穩定的品名（地瓜葉、莧菜等）
     print("  補查特定品名…")
     seen_display = set(r.get("CropName","") for r in agri_raw)
@@ -292,15 +292,15 @@ def main():
                 print(f"    {display_name}（{api_name}）→ {len(extra)} 筆")
                 agri_raw.extend(extra)
                 seen_display.add(display_name)
-
+ 
     agri_prices = [p for r in agri_raw for p in [agri_to_price(r)] if p]
-
+ 
     print("\n=== 農業部漁業署行情 ===")
     aqua_raw    = fetch_all_aquatic()
     aqua_prices = [p for r in aqua_raw for p in [aquatic_to_price(r)] if p]
-
+ 
     all_prices = deduplicate(agri_prices + aqua_prices)
-
+ 
     # 統計
     cats = {}
     for p in all_prices:
@@ -308,7 +308,7 @@ def main():
     print(f"\n✅ 合計 {len(all_prices)} 筆有效行情")
     for cat, count in sorted(cats.items()):
         print(f"   {cat}: {count} 筆")
-
+ 
     # 寫出 JSON
     import os
     os.makedirs("docs", exist_ok=True)
@@ -321,6 +321,6 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, separators=(",", ":"))
     print(f"\n💾 已寫入 {out_path}")
-
+ 
 if __name__ == "__main__":
     main()
