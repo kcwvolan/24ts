@@ -71,11 +71,13 @@ for display, api_names in API_ALIAS.items():
         _REVERSE_ALIAS[api_name] = display
 
 def normalize_name(crop_name: str) -> str:
-    """將 API 回傳品名正規化為 App 顯示關鍵字，找不到則原樣回傳"""
-    for api_name, display in _REVERSE_ALIAS.items():
-        if api_name in crop_name:
-            return display
-    return crop_name
+    """將 API 回傳品名正規化為 App 顯示關鍵字，取最長匹配避免子字串誤判"""
+    matches = [(api_name, display) for api_name, display in _REVERSE_ALIAS.items()
+               if api_name in crop_name]
+    if not matches:
+        return crop_name
+    # 取最長 api_name，例：「葉用甘藷」優先於「甘藷」，避免誤判為「地瓜」
+    return max(matches, key=lambda x: len(x[0]))[1]
 
 def classify(name: str) -> str | None:
     base = name.split("-")[0].split("－")[0].strip()
