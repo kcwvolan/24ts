@@ -206,10 +206,11 @@ def main():
     for cat, count in sorted(cats.items()):
         print(f"   {cat}: {count} 筆")
 
-    # 寫出 JSON
-     os.makedirs("docs", exist_ok=True)
+   # 寫出 JSON
+    import os
+    os.makedirs("docs", exist_ok=True)
     meta = {
-        "updatedAt": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "count":     len(all_prices),
         "prices":    all_prices,
     }
