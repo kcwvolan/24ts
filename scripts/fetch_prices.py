@@ -143,6 +143,40 @@ def fetch_all_agri(lookback: int = 3) -> list[dict]:
             return records
     return []
 
+# 全量抓取不穩定的品名，需指定 CropName 補查
+# 對應 Swift 的 forceSupplementAgriKeywords
+SUPPLEMENT_QUERIES: list[tuple[str, str]] = [
+    # (顯示名稱, API查詢品名)
+    ("地瓜葉", "葉用甘藷"),
+    ("地瓜葉", "甘藷葉"),
+    ("莧菜",   "莧菜"),
+    ("龍鬚菜", "龍鬚菜"),
+    ("地瓜",   "甘藷"),
+    ("蘆筍",   "石刁柏"),
+    ("山藥",   "淮山"),
+]
+
+def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 3) -> list[dict]:
+    """以指定 CropName 查詢，結果的 CropName 強制設為 display_name"""
+    params_base = {"End_time": "", "Start_time": "", "CropName": crop_name}
+    for offset in range(lookback):
+        date_str = roc_date(offset)
+        params = urllib.parse.urlencode({
+            "Start_time": date_str,
+            "End_time":   date_str,
+            "CropName":   crop_name,
+        })
+        data = fetch_json(f"{AGRI_BASE}?{params}")
+        if not data:
+            continue
+        records = data.get("Data") or []
+        if records:
+            # 強制設定 CropName 為 display_name，讓後續 normalize_name 能對到
+            for r in records:
+                r["CropName"] = display_name
+            return records
+    return []
+
 def parse_float(val) -> float:
     try:
         if isinstance(val, (int, float)):
@@ -237,7 +271,19 @@ def deduplicate(prices: list[dict]) -> list[dict]:
 # ── 主程式 ────────────────────────────────────────────────────────────────────
 def main():
     print("=== 農業部農糧署行情 ===")
-    agri_raw    = fetch_all_agri()
+    agri_raw = fetch_all_agri()
+
+    # 補查全量抓取不穩定的品名（地瓜葉、莧菜等）
+    print("  補查特定品名…")
+    seen_display = set(r.get("CropName","") for r in agri_raw)
+    for display_name, api_name in SUPPLEMENT_QUERIES:
+        if display_name not in seen_display:
+            extra = fetch_agri_by_name(api_name, display_name)
+            if extra:
+                print(f"    {display_name}（{api_name}）→ {len(extra)} 筆")
+                agri_raw.extend(extra)
+                seen_display.add(display_name)
+
     agri_prices = [p for r in agri_raw for p in [agri_to_price(r)] if p]
 
     print("\n=== 農業部漁業署行情 ===")
