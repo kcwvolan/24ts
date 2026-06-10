@@ -159,25 +159,23 @@ SUPPLEMENT_QUERIES: list[tuple[str, str]] = [
 ]
 
 def fetch_agri_by_name(crop_name: str, display_name: str, lookback: int = 7) -> list[dict]:
-    """以指定 CropName 查詢，結果的 CropName 強制設為 display_name"""
-    params_base = {"End_time": "", "Start_time": "", "CropName": crop_name}
-    for offset in range(lookback):
-        date_str = roc_date(offset)
-        params = urllib.parse.urlencode({
-            "Start_time": date_str,
-            "End_time":   date_str,
-            "CropName":   crop_name,
-        })
-        data = fetch_json(f"{AGRI_BASE}?{params}")
-        if not data:
-            continue
-        records = data.get("Data") or []
-        if records:
-            # 強制設定 CropName 為 display_name，讓後續 normalize_name 能對到
-            for r in records:
-                r["CropName"] = display_name
-            return records
-    return []
+    """以指定 CropName 查詢最近 lookback 天的資料（一次查日期區間，比逐日更可靠）"""
+    start_date = roc_date(lookback - 1)   # e.g. 7 天前
+    end_date   = roc_date(0)              # 今天
+    params = urllib.parse.urlencode({
+        "Start_time": start_date,
+        "End_time":   end_date,
+        "CropName":   crop_name,
+    })
+    data = fetch_json(f"{AGRI_BASE}?{params}")
+    if not data:
+        return []
+    records = data.get("Data") or []
+    print(f"      [{start_date}~{end_date}] {crop_name}: {len(records)} 筆原始資料")
+    # 強制設定 CropName 為 display_name，讓後續 normalize_name 能對到
+    for r in records:
+        r["CropName"] = display_name
+    return records
 
 def parse_float(val) -> float:
     try:
