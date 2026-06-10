@@ -6,7 +6,8 @@
 import json
 import urllib.request
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import os
 
 # ── 品名分類白名單（對應 MarketPriceService.swift 邏輯）──────────────────────
 VEGETABLE_KW = [
@@ -206,6 +207,7 @@ def main():
         print(f"   {cat}: {count} 筆")
 
     # 寫出 JSON
+     os.makedirs("docs", exist_ok=True)
     meta = {
         "updatedAt": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "count":     len(all_prices),
