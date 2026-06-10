@@ -197,8 +197,17 @@ def agri_to_price(r: dict) -> dict | None:
     high         = parse_float(r.get("Upper_Price", 0))
     mid          = parse_float(r.get("Middle_Price", 0))
     low          = parse_float(r.get("Lower_Price", 0))
+    avg          = parse_float(r.get("Avg_Price", 0))
+    # 農業部對少量交易品項常不填中間價，依序 fallback
     if mid <= 0:
-        return None
+        if avg > 0:
+            mid = avg
+        elif high > 0 and low > 0:
+            mid = round((high + low) / 2, 1)
+        elif high > 0:
+            mid = high
+        else:
+            return None
     display_name = normalize_name(crop)  # 「葉用甘藷」→「地瓜葉」等
     return {
         "id":          f"{date}-{display_name}-{market}",
