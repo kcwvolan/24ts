@@ -2,15 +2,19 @@ name: 每日行情快取更新
 
 on:
   schedule:
-    # 台灣時間 23:30（UTC 15:30）— 農業部收盤後約 2 小時
     - cron: "30 15 * * *"
-  workflow_dispatch:   # 允許手動觸發
+  workflow_dispatch:
 
 jobs:
   fetch-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # 需要 push 到 gh-pages
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -24,24 +28,29 @@ jobs:
       - name: 抓取行情資料
         run: python scripts/fetch_prices.py
 
-      - name: 確認輸出
+      - name: 確認輸出（0 筆則中止，不覆蓋舊版）
         run: |
-          echo "=== prices.json 前 3 筆 ==="
           python3 -c "
-          import json
+          import json, sys
           with open('docs/prices.json') as f:
               d = json.load(f)
+          count = d.get('count', 0)
           print(f'updatedAt: {d[\"updatedAt\"]}')
-          print(f'count: {d[\"count\"]}')
-          for p in d['prices'][:3]:
-              print(p)
+          print(f'count: {count}')
+          if count == 0:
+              print('❌ 本次抓取 0 筆，中止 deploy')
+              sys.exit(1)
+          print(f'✅ {count} 筆，繼續 deploy')
           "
 
-      - name: Deploy 到 GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          publish_branch: gh-pages
-          force_orphan: true    # gh-pages branch 只保留最新一次
-          commit_message: "chore: 更新行情快取 ${{ github.run_id }}"
+          path: 'docs'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
