@@ -1,0 +1,55 @@
+name: Monitor prices.json quality
+
+on:
+  schedule:
+    # 每天台灣時間 01:30（UTC 17:30）執行，即主要抓取（23:30 TW = 15:30 UTC）完成約 2 小時後
+    - cron: '30 17 * * *'
+  workflow_dispatch:  # 允許手動觸發測試
+
+jobs:
+  check-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 取得 prices.json 並驗證品質
+        run: |
+          echo "=== 抓取 prices.json ==="
+          curl -sf -o /tmp/prices.json \
+            "https://kcwvolan.github.io/24ts/prices.json" \
+            || { echo "❌ 無法取得 prices.json"; exit 1; }
+
+          echo "=== 解析品質欄位 ==="
+          UPDATED_AT=$(python3 -c "import json; d=json.load(open('/tmp/prices.json')); print(d.get('updatedAt','unknown'))")
+          COUNT=$(python3 -c "import json; d=json.load(open('/tmp/prices.json')); print(d.get('count',0))")
+          VEG=$(python3 -c "import json; d=json.load(open('/tmp/prices.json')); print(d.get('vegCount', len([p for p in d.get('prices',[]) if p.get('category')=='蔬菜'])))")
+          FRUIT=$(python3 -c "import json; d=json.load(open('/tmp/prices.json')); print(d.get('fruitCount', len([p for p in d.get('prices',[]) if p.get('category')=='水果'])))")
+          SEAFOOD=$(python3 -c "import json; d=json.load(open('/tmp/prices.json')); print(d.get('seafoodCount', len([p for p in d.get('prices',[]) if p.get('category')=='漁貨'])))")
+
+          echo "updatedAt  : $UPDATED_AT"
+          echo "total count: $COUNT"
+          echo "蔬菜       : $VEG"
+          echo "水果       : $FRUIT"
+          echo "漁貨       : $SEAFOOD"
+
+          # 品質門檻（調整自 fetch_prices.py 的防護條件）
+          FAIL=0
+          if [ "$VEG" -lt 200 ]; then
+            echo "❌ 蔬菜 $VEG 筆 < 200，資料異常！"
+            FAIL=1
+          fi
+          if [ "$FRUIT" -lt 50 ]; then
+            echo "❌ 水果 $FRUIT 筆 < 50，資料異常！"
+            FAIL=1
+          fi
+          if [ "$SEAFOOD" -lt 10 ]; then
+            echo "❌ 漁貨 $SEAFOOD 筆 < 10，資料異常！"
+            FAIL=1
+          fi
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo ""
+            echo "⚠️  prices.json 品質不合格！GitHub Actions 已標記為失敗。"
+            echo "   請前往 Actions 頁面確認主要 fetch-prices workflow 是否正常執行。"
+            exit 1
+          fi
+
+          echo "✅ 所有品質檢查通過"
