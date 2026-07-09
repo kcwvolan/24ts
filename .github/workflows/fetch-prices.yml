@@ -2,16 +2,16 @@ name: 每日行情快取更新
 
 on:
   schedule:
+    # 台灣時間 23:30（UTC 15:30）— 農業部收盤後約 2 小時
     - cron: "30 15 * * *"
-  workflow_dispatch:
+  workflow_dispatch:   # 允許手動觸發
 
 jobs:
   fetch-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     permissions:
-      pages: write
-      id-token: write
+      pages: write       # 部署 GitHub Pages 所需
+      id-token: write    # OIDC 驗證所需
 
     environment:
       name: github-pages
@@ -38,8 +38,10 @@ jobs:
           count = d.get('count', 0)
           print(f'updatedAt: {d[\"updatedAt\"]}')
           print(f'count: {count}')
+          for p in d['prices'][:3]:
+              print(p)
           if count == 0:
-              print('❌ 本次抓取 0 筆，中止 deploy')
+              print('❌ 本次抓取 0 筆，中止 deploy 以保留舊版資料')
               sys.exit(1)
           print(f'✅ {count} 筆，繼續 deploy')
           "

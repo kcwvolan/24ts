@@ -385,6 +385,9 @@ def main():
     cats = {}
     for p in all_prices:
         cats[p["category"]] = cats.get(p["category"], 0) + 1
+    veg_count    = cats.get("蔬菜", 0)
+    fruit_count  = cats.get("水果", 0)
+    sea_count    = cats.get("漁貨", 0)
     print(f"\n✅ 合計 {len(all_prices)} 筆有效行情")
     for cat, count in sorted(cats.items()):
         print(f"   {cat}: {count} 筆")
@@ -397,8 +400,6 @@ def main():
 
     # 防護：農業部農糧署 API 部分失敗時，蔬菜或水果筆數會異常偏低
     # 正常情況：蔬菜 ≥ 200 筆、水果 ≥ 50 筆；低於此值表示農業部 API 逾時，不覆蓋舊版
-    veg_count   = cats.get("蔬菜", 0)
-    fruit_count = cats.get("水果", 0)
     if veg_count < 200:
         print(f"\n❌ 蔬菜僅 {veg_count} 筆（閾值 200），農業部農糧署 API 疑似逾時。")
         print("   中止寫出，保留 docs/prices.json 舊版資料。")
@@ -415,9 +416,12 @@ def main():
     _DOCS_DIR   = os.path.join(_SCRIPT_DIR, "..", "docs")
     os.makedirs(_DOCS_DIR, exist_ok=True)
     meta = {
-        "updatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "count":     len(all_prices),
-        "prices":    all_prices,
+        "updatedAt":    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "count":        len(all_prices),
+        "vegCount":     veg_count,
+        "fruitCount":   fruit_count,
+        "seafoodCount": sea_count,
+        "prices":       all_prices,
     }
     out_path = os.path.join(_DOCS_DIR, "prices.json")
     with open(out_path, "w", encoding="utf-8") as f:
